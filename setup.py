@@ -9,9 +9,9 @@ with open(path.join(this_directory, 'README.md'), encoding='utf-8') as f:
 setup(name='cbpi4-TwoKettleLogic',
       version='0.0.1',
       description='CraftBeerPi Plugin',
-      author='',
-      author_email='',
-      url='',
+      author='Steven Hoglund',
+      author_email='sjhoglund@gmail.com',
+      url='https://github.com/sjhoglund/cbpi4-TwoKettleLogic.git',
       include_package_data=True,
       package_data={
         # If any package contains *.txt or *.rst files, include them:
