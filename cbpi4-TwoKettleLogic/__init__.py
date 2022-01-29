@@ -7,71 +7,45 @@ from unittest.mock import MagicMock, patch
 import asyncio
 import random
 from cbpi.api import *
+from cbpi.api.step import CBPiStep, StepResult
+from cbpi.api.dataclasses import NotificationAction, NotificationType
 
 logger = logging.getLogger(__name__)
 
+@parameters([
+     Property.Number(label="Temp_Kettle_1", configurable=True),
+     Property.Sensor(label="Sensor_Kettle_1"),
+     Property.Kettle(label="Kettle_1"),
+     Property.Number(label="Temp_Kettle_2", configurable=True),
+     Property.Sensor(label="Sensor_Kettle_2"),
+     Property.Kettle(label="Kettle_2")
+])
 
-class CustomWebExtension(CBPiExtension):
-
-    @request_mapping(path="/", auth_required=False)
-    async def hello_world(self, request):
-        return web.HTTPFound('static/index.html')
-
-    def __init__(self, cbpi):
-        self.cbpi = cbpi
-        path = os.path.dirname(__file__)
-        self.cbpi.register(self, "/cbpi_uiplugin", static=os.path.join(path, "static"))
-
-
-@parameters([])
-class CustomSensor(CBPiSensor):
+class TwoKettleStep(CBPiStep):
     
-    def __init__(self, cbpi, id, props):
-        super(CustomSensor, self).__init__(cbpi, id, props)
-        self.value = 0
+    async def NextStep(self, **kwargs):
+        await self.next()
 
-    @action(key="Test", parameters=[])
-    async def action1(self, **kwargs):
-        print("ACTION!", kwargs)
+    async def on_start(self):
+        
+        self.kettle=self.get_kettle(self.props.get("Kettle_1", None))
+        self.kettle.target_temp = int(self.props.get("Temp_Kettle_1", 0))
+        self.kettle=self.get_kettle(self.props.get("Kettle_2", None))
+        self.kettle.target_temp = int(self.props.get("Temp_Kettle_2", 0))  
+        
+        await self.push_update()
 
     async def run(self):
-        while self.running is True:
-            self.value = random.randint(0,50)
-            self.push_update(self.value)
+        while self.running == True:
             await asyncio.sleep(1)
-    
-    def get_state(self):
-        return dict(value=self.value)
-
-@parameters([])
-class CustomActor(CBPiActor):
-
-    @action("action", parameters={})
-    async def action(self, **kwargs):
-        print("Action Triggered", kwargs)
-        pass
-    
-    def init(self):
-        self.state = False
-        pass
-
-    async def on(self, power=0):
-        logger.info("ACTOR 1111 %s ON" % self.id)
-        self.state = True
-
-    async def off(self):
-        logger.info("ACTOR %s OFF " % self.id)
-        self.state = False
-
-    def get_state(self):
-        return self.state
-    
-    async def run(self):
-        pass
-
+            sensor_value_1 = self.get_sensor_value(self.props.get("Sensor_Kettle_1", None)).get("value")
+            sensor_value_2 = self.get_sensor_value(self.props.get("Sensor_Kettle_2", None)).get("value")
+            set_temp_1 = int(self.props.get("Temp_Kettle_1",0))
+            set_temp_2 = int(self.props.get("Temp_Kettle_2",0))
+            if sensor_value_1 >= set_temp_1 and sensor_value_2 >= set_temp_2:
+                self.cbpi.notify(self.name, "Kettle Temps Reached!", NotificationType.INFO)
+        return StepResult.DONE
 
 def setup(cbpi):
-    #cbpi.plugin.register("MyCustomActor", CustomActor)
-    #cbpi.plugin.register("MyCustomSensor", CustomSensor)
-    #cbpi.plugin.register("MyustomWebExtension", CustomWebExtension)
+    cbpi.plugin.register("TwoKettleLogic", TwoKettleStep)
     pass
