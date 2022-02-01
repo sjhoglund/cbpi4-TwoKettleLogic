@@ -42,7 +42,9 @@ class TwoKettleStep(CBPiStep):
     async def on_start(self):
         self.port = str(self.cbpi.static_config.get('port',8000))
         self.setKettleTarget(self.props.get("Kettle_1", None), self.get_kettle(self.props.get("Kettle_1", None)), int(self.props.get("Temp_1", 0)))
+        await asyncio.sleep(1)
         self.setKettleTarget(self.props.get("Kettle_2", None), self.get_kettle(self.props.get("Kettle_2", None)), int(self.props.get("Temp_2", 0)))
+        await asyncio.sleep(1)
         self.summary = "Waiting for Target Temp..."
         if self.timer is None:
             self.timer = Timer(1 ,on_update=self.on_timer_update, on_done=self.on_timer_done)
@@ -73,7 +75,7 @@ class TwoKettleStep(CBPiStep):
         self.kettle = kettle_info
         self.kettle.target_temp = kettle_temp
         await self.push_update()
-        self.cbpi.notify(self.name, 'Kettle: '+kettle_name+'| Temp set: '+kettle_temp, NotificationType.INFO)
+        self.summary = kettle_name+" temp set: "+kettle_temp
 
 
 def setup(cbpi):
