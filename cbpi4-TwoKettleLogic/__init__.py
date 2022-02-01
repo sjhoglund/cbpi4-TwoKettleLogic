@@ -24,7 +24,8 @@ import warnings
              Property.Kettle(label="Kettle_1"),
              Property.Number(label="Temp_2", configurable=True),
              Property.Sensor(label="Sensor_2"),
-             Property.Kettle(label="Kettle_2")])
+             Property.Kettle(label="Kettle_2"),
+             Property.Select(label="AutoMode",options=["Yes","No"], description="Switch Kettlelogic automatically on and off -> Yes")])
 
 class TwoKettleStep(CBPiStep):
     
@@ -34,19 +35,20 @@ class TwoKettleStep(CBPiStep):
     async def on_timer_done(self,timer):
         self.summary = "MashIn Temp reached."
         await self.push_update()
-        self.cbpi.notify(self.name, 'MashIn Temp reached. Time to dough-in! Move to next step', action=[NotificationAction("Next Step", self.NextStep)])
+        self.cbpi.notify(self.name, 'MashIn Temp reached. Time to dough-in! Move to next step. Make sure auto is turned off!', action=[NotificationAction("Next Step", self.NextStep)])
 
     async def on_timer_update(self,timer, seconds):
         await self.push_update()
 
     async def on_start(self):
-        self.summary = "Setting target temps..."
-        await self.push_update()
         self.port = str(self.cbpi.static_config.get('port',8000))
+        self.AutoMode = True if self.props.get("AutoMode","No") == "Yes" else False
         self.kettle1=self.get_kettle(self.props.get("Kettle_1", None))
         self.kettle1.target_temp = int(self.props.get("Temp_1", 0))
         self.kettle2=self.get_kettle(self.props.get("Kettle_2", None))
         self.kettle2.target_temp = int(self.props.get("Temp_2", 0))
+        if self.AutoMode == True:
+            await self.setAutoMode(True)
         self.summary = "Waiting for Target Temp..."
         if self.timer is None:
             self.timer = Timer(1 ,on_update=self.on_timer_update, on_done=self.on_timer_done)
@@ -55,8 +57,8 @@ class TwoKettleStep(CBPiStep):
     async def on_stop(self):
         await self.timer.stop()
         self.summary = ""
-        self.kettle1.target_temp = int(0)
-        self.kettle2.target_temp = int(0)
+        if self.AutoMode == True:
+            await self.setAutoMode(False)
         await self.push_update()
 
     async def run(self):
@@ -72,6 +74,28 @@ class TwoKettleStep(CBPiStep):
 
     async def reset(self):
         self.timer = Timer(1 ,on_update=self.on_timer_update, on_done=self.on_timer_done)
+    
+    async def setAutoMode(self, auto_state):
+        try:
+            if (self.kettle1.instance is None or self.kettle1.instance.state == False) and (self.kettle2.instance is None or self.kettle2.instance.state == False) and (auto_state is True):
+                url1="http://127.0.0.1:" + self.port + "/kettle/"+ self.kettle1.id+"/toggle"
+                url2="http://127.0.0.1:" + self.port + "/kettle/"+ self.kettle2.id+"/toggle"
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(url1) as response:
+                        return await response.text()
+                        await self.push_update()
+                    async with session.post(url2) as response:
+                        return await response.text()
+                        await self.push_update()
+            elif (self.kettle1.instance.state == True) and (self.kettle2.instance.state == True) and (auto_state is False):
+
+                await self.kettle1.instance.stop()
+                await self.kettle2.instance.stop()
+                await self.push_update()
+
+        except Exception as e:
+            logging.error("Failed to switch on KettleLogic {} {}".format(self.kettle1.id, e))
+            logging.error("Failed to switch on KettleLogic {} {}".format(self.kettle2.id, e))
 
 
 def setup(cbpi):
