@@ -40,11 +40,13 @@ class TwoKettleStep(CBPiStep):
         await self.push_update()
 
     async def on_start(self):
+        self.summary = "Setting target temps..."
+        await self.push_update()
         self.port = str(self.cbpi.static_config.get('port',8000))
-        self.setKettleTarget("Kettle_1", "Temp_1")
-        await asyncio.sleep(10)
-        self.setKettleTarget("Kettle_2", "Temp_2")
-        await asyncio.sleep(10)
+        self.kettle1=self.get_kettle(self.props.get("Kettle_1", None))
+        self.kettle1.target_temp = int(self.props.get("Temp_1", 0))
+        self.kettle2=self.get_kettle(self.props.get("Kettle_2", None))
+        self.kettle2.target_temp = int(self.props.get("Temp_2", 0))
         self.summary = "Waiting for Target Temp..."
         if self.timer is None:
             self.timer = Timer(1 ,on_update=self.on_timer_update, on_done=self.on_timer_done)
@@ -53,8 +55,8 @@ class TwoKettleStep(CBPiStep):
     async def on_stop(self):
         await self.timer.stop()
         self.summary = ""
-        self.setKettleTarget(self.props.get("Kettle_1", None), self.get_kettle(self.props.get("Kettle_1", None)), 0)
-        self.setKettleTarget(self.props.get("Kettle_2", None), self.get_kettle(self.props.get("Kettle_2", None)), 0)
+        self.kettle1.target_temp = int(0)
+        self.kettle2.target_temp = int(0)
         await self.push_update()
 
     async def run(self):
@@ -70,12 +72,6 @@ class TwoKettleStep(CBPiStep):
 
     async def reset(self):
         self.timer = Timer(1 ,on_update=self.on_timer_update, on_done=self.on_timer_done)
-
-    async def setKettleTarget(self, ktl, tmp):
-        self.kettle = self.get_kettle(self.props.get(ktl, None))
-        self.kettle.target_temp = int(self.props.get(tmp, 0))
-        await self.push_update()
-        self.summary = ktl+" temp set: "+tmp
 
 
 def setup(cbpi):
