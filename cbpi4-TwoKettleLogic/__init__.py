@@ -77,33 +77,21 @@ class TwoKettleStep(CBPiStep):
     
     async def setAutoMode(self, auto_state):
         try:
-            if (self.kettle1.instance is None or self.kettle1.instance.state == False) and (auto_state is True):
+            if (self.kettle1.instance is None or self.kettle1.instance.state == False) and (self.kettle2.instance is None or self.kettle2.instance.state == False) and (auto_state is True):
                 url1="http://127.0.0.1:" + self.port + "/kettle/"+ self.kettle1.id+"/toggle"
+                url2="http://127.0.0.1:" + self.port + "/kettle/"+ self.kettle2.id+"/toggle"
                 async with aiohttp.ClientSession() as session:
-                    async with session.post(url1) as response:
-                        return await response.text()
+                    async with session.post(url1) as response1, session.post(url2) as response2:
+                        return await response1.text()
                         await self.push_update()
-            elif (self.kettle1.instance.state == True) and (auto_state is False):
+            elif (self.kettle1.instance.state == True) and (self.kettle2.instance.state == True) and (auto_state is False):
 
                 await self.kettle1.instance.stop()
+                await self.kettle2.instance.stop()
                 await self.push_update()
 
         except Exception as e:
             logging.error("Failed to switch on KettleLogic {} {}".format(self.kettle1.id, e))
-            
-        try:
-            if (self.kettle2.instance is None or self.kettle2.instance.state == False) and (auto_state is True):
-                url2="http://127.0.0.1:" + self.port + "/kettle/"+ self.kettle2.id+"/toggle"
-                async with aiohttp.ClientSession() as session:
-                    async with session.post(url2) as response:
-                        return await response.text()
-                        await self.push_update()
-            elif (self.kettle2.instance.state == True) and (auto_state is False):
-
-                await self.kettle2.instance.stop()
-                await self.push_update()
-        except Exception as e:
-            logging.error("Failed to switch on KettleLogic {} {}".format(self.kettle2.id, e))
 
 
 def setup(cbpi):
